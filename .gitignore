@@ -1,0 +1,6 @@
+out/
+
+temp/
+
+resource/
+!resource/templete/

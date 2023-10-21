@@ -15,8 +15,9 @@ from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor, OneCellAnchor, 
 import copy
 
 TEMPLETE_PATH = r".\resource\templete\templete.xlsx" # 最终订单模板路径
-DIANXIAOMI_ORDER_PATH = r".\resource\a.xlsx" # 店小秘导出模板
-DST_ORDER_PATH = r".\resource\result.xlsx" # 最终输出的订单
+
+RESOUCE_PATH = r".\resource"
+OUTPUT_PATH = r".\out"
 
 
 def main():
@@ -24,57 +25,64 @@ def main():
 
     start_time = time.time()
 
-    # 读取店小秘导出订单表格
-    workbookDianXiaoMi = openpyxl.load_workbook(DIANXIAOMI_ORDER_PATH)
-    worksheetDianXiaoMi = workbookDianXiaoMi["order_"]
+    # 遍历 RESOUCE_PATH 文件夹下所有文件，找出xlsx文件，并打印不带后缀文件名
+    for file in os.listdir(RESOUCE_PATH):
+        if file.endswith(".xlsx"):
+            file_name = file[:-5]
+            filePath = os.path.join(RESOUCE_PATH, file)
+            print("=======开始===：", filePath)
 
-    # 店小秘表头
-    sheetHead = []
-    for cell in worksheetDianXiaoMi[1]:
-        sheetHead.append(cell.value)
+            # 读取店小秘导出订单表格
+            workbookDianXiaoMi = openpyxl.load_workbook(filePath)
+            worksheetDianXiaoMi = workbookDianXiaoMi["order_"]
 
-    # 遍历店小秘中的订单
-    rawData = []
-    skuColor = {}
-    for row in worksheetDianXiaoMi.iter_rows(min_row=2):
-        if all(cell.value is None for cell in row):
-            continue # 空行跳过
-        
-        productSpecifications = row[sheetHead.index("产品规格")].value
+            # 店小秘表头
+            sheetHead = []
+            for cell in worksheetDianXiaoMi[1]:
+                sheetHead.append(cell.value)
 
-        # 支持的尺码配置
-        sizePart = re.findall(r'Size:(?:xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)?', productSpecifications, re.IGNORECASE)[0]
-        # size转换为同一格式，大写，XXXL改成3XL
-        size = sizePart.split(":")[1].upper()
-        num_x = len(re.findall(r'X', size))
-        if num_x > 1:
-            size = size.replace('X' * num_x, str(num_x) + "X")
+            # 遍历店小秘中的订单
+            rawData = []
+            skuColor = {}
+            for row in worksheetDianXiaoMi.iter_rows(min_row=2):
+                if all(cell.value is None for cell in row):
+                    continue # 空行跳过
+                
+                productSpecifications = row[sheetHead.index("产品规格")].value
 
-        colorPart = productSpecifications.replace(sizePart, "")
-        color = colorPart.split(":")[1].replace(" ", "_") # color 的空格转换成_,key不能有空格
+                # 支持的尺码配置
+                sizePart = re.findall(r'Size:(?:xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)?', productSpecifications, re.IGNORECASE)[0]
+                # size转换为同一格式，大写，XXXL改成3XL
+                size = sizePart.split(":")[1].upper()
+                num_x = len(re.findall(r'X', size))
+                if num_x > 1:
+                    size = size.replace('X' * num_x, str(num_x) + "X")
 
-        goodsId = row[sheetHead.index("产品ID")].value
-        rawDataItem = {}
+                colorPart = productSpecifications.replace(sizePart, "")
+                color = colorPart.split(":")[1].replace(" ", "_") # color 的空格转换成_,key不能有空格
 
-        goodsNum = row[sheetHead.index("产品数量")].value
-        if goodsId + color in skuColor:
-            rawDataItem = rawData[skuColor[goodsId+color]]
-            if size in rawDataItem["sizeNum"]:
-                rawDataItem["sizeNum"][size] = rawDataItem["sizeNum"][size] + goodsNum
-            else:
-                rawDataItem["sizeNum"][size] = goodsNum
-        else:
-            rawDataItem = {
-                "goodsName": row[sheetHead.index("产品名称")].value,
-                "sizeNum": {size: goodsNum},
-                "imgUrl": row[sheetHead.index("图片网址")].value,
-                "sku": goodsId,
-                "color": color,
-            }
-            skuColor[goodsId + color] = len(rawData)
-            rawData.append(rawDataItem)
+                goodsId = row[sheetHead.index("产品ID")].value
+                rawDataItem = {}
 
-    genfinalOrder(rawData)
+                goodsNum = row[sheetHead.index("产品数量")].value
+                if goodsId + color in skuColor:
+                    rawDataItem = rawData[skuColor[goodsId+color]]
+                    if size in rawDataItem["sizeNum"]:
+                        rawDataItem["sizeNum"][size] = rawDataItem["sizeNum"][size] + goodsNum
+                    else:
+                        rawDataItem["sizeNum"][size] = goodsNum
+                else:
+                    rawDataItem = {
+                        "goodsName": row[sheetHead.index("产品名称")].value,
+                        "sizeNum": {size: goodsNum},
+                        "imgUrl": row[sheetHead.index("图片网址")].value,
+                        "sku": goodsId,
+                        "color": color,
+                    }
+                    skuColor[goodsId + color] = len(rawData)
+                    rawData.append(rawDataItem)
+
+            genfinalOrder(rawData, file_name)
 
     end_time = time.time()
     elapsed_time = end_time - start_time
@@ -145,7 +153,7 @@ def inster_image(worksheet, start_row, start_col, hieght, image_url, image_size=
 
 
 # 输入从店小秘导出的订单中原始数据，生成最终表格
-def genfinalOrder(rawData):
+def genfinalOrder(rawData, file_name):
     print("start gen Order-------------")
 
     # 读取最终订单模板
@@ -243,7 +251,7 @@ def genfinalOrder(rawData):
                 cell = worksheetTemplete.cell(row=row, column=col)
                 cell.border = thin_border
 
-    workbookDianTemplete.save(DST_ORDER_PATH)
+    workbookDianTemplete.save(os.path.join(OUTPUT_PATH, f'{file_name}_result.xlsx'))
 
 
 
