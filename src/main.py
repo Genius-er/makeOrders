@@ -87,6 +87,7 @@ def main():
     end_time = time.time()
     elapsed_time = end_time - start_time
     print("脚本总用时: {} 分 {} 秒".format(int(elapsed_time/60), int(elapsed_time%60)))
+    print("输出文件在 out 这个文件夹里")
 
 
 
@@ -250,6 +251,10 @@ def genfinalOrder(rawData, file_name):
             for row in range(goodsRaw, goodsRaw + 2):
                 cell = worksheetTemplete.cell(row=row, column=col)
                 cell.border = thin_border
+
+    # 没有 OUTPUT_PATH 这个文件夹则创建这个文件夹
+    if not os.path.exists(OUTPUT_PATH):
+        os.mkdir(OUTPUT_PATH)
 
     workbookDianTemplete.save(os.path.join(OUTPUT_PATH, f'{file_name}_result.xlsx'))
 
