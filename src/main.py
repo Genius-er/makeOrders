@@ -2,6 +2,7 @@ import openpyxl
 import os
 import requests
 from openpyxl.drawing.image import Image
+import PIL
 import urllib.request
 from openpyxl.styles import Alignment
 import re
@@ -13,6 +14,7 @@ from openpyxl.utils.units import cm_to_EMU
 from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor, OneCellAnchor, AnchorMarker
 import copy
+import io
 
 TEMPLETE_PATH = r".\resource\templete\templete.xlsx" # 最终订单模板路径
 
@@ -68,13 +70,13 @@ def main():
                 if goodsId + color in skuColor:
                     rawDataItem = rawData[skuColor[goodsId+color]]
                     if size in rawDataItem["sizeNum"]:
-                        rawDataItem["sizeNum"][size] = rawDataItem["sizeNum"][size] + goodsNum
+                        rawDataItem["sizeNum"][size] = int(rawDataItem["sizeNum"][size] + goodsNum)
                     else:
-                        rawDataItem["sizeNum"][size] = goodsNum
+                        rawDataItem["sizeNum"][size] = int(goodsNum)
                 else:
                     rawDataItem = {
                         "goodsName": row[sheetHead.index("产品名称")].value,
-                        "sizeNum": {size: goodsNum},
+                        "sizeNum": {size: int(goodsNum)},
                         "imgUrl": row[sheetHead.index("图片网址")].value,
                         "sku": goodsId,
                         "color": color,
@@ -131,6 +133,8 @@ def get_absolute(worksheet, row, col):
 def inster_image(worksheet, start_row, start_col, hieght, image_url, image_size=None):
 
     img = Image(image_url)
+    # 将图像转换为JPEG格式
+    # img = img.convert("RGB")
     img.height, img.width = image_size
     col_letter = get_column_letter(start_col)
     width = worksheet.column_dimensions[col_letter].width
@@ -149,8 +153,6 @@ def inster_image(worksheet, start_row, start_col, hieght, image_url, image_size=
     marker = AnchorMarker(col=start_col - 1, colOff=colOff, row=start - 1, rowOff=rowOff)
     img.anchor = OneCellAnchor(_from=marker, ext=size)
     worksheet.add_image(img)
-
-
 
 
 # 输入从店小秘导出的订单中原始数据，生成最终表格
@@ -194,8 +196,9 @@ def genfinalOrder(rawData, file_name):
             opener.addheaders = [('User-agent', 'Mozilla/5.0')]
             response = opener.open(rawDataItem["imgUrl"])
             # 暂存图片
-            with open("./temp/tempImg{}.jpg".format(i), "wb") as f:
-                f.write(response.read())
+            img = PIL.Image.open(io.BytesIO(response.read()))
+            img = img.convert("RGB")
+            img.save("./temp/tempImg{}.jpg".format(i))
             # 设置产品图片
             inster_image(worksheetTemplete, goodsRaw + 1, 2, 0, "./temp/tempImg{}.jpg".format(i), image_size=(60, 60))
 
@@ -257,6 +260,7 @@ def genfinalOrder(rawData, file_name):
         os.mkdir(OUTPUT_PATH)
 
     workbookDianTemplete.save(os.path.join(OUTPUT_PATH, f'{file_name}_result.xlsx'))
+    print(os.path.join(OUTPUT_PATH, f'{file_name}_result.xlsx'))
 
 
 
