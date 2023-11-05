@@ -198,6 +198,11 @@ def genfinalOrder(rawData, file_name):
             # 暂存图片
             img = PIL.Image.open(io.BytesIO(response.read()))
             img = img.convert("RGB")
+
+            # 没有 temp 文件夹就创建一个 temp文件夹
+            if not os.path.exists("./temp"):
+                os.mkdir("./temp")
+
             img.save("./temp/tempImg{}.jpg".format(i))
             # 设置产品图片
             inster_image(worksheetTemplete, goodsRaw + 1, 2, 0, "./temp/tempImg{}.jpg".format(i), image_size=(60, 60))

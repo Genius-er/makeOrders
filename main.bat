@@ -17,6 +17,8 @@ if not defined pythonPath (
     rem 下载 Python 安装包
     bitsadmin /transfer PythonInstaller https://www.python.org/ftp/python/%downloadVersion%/python-%downloadVersion%-amd64.exe %temp%\python-%downloadVersion%-amd64.exe
     
+
+    echo 安装的时候任务栏出现盾牌一样的对计算机进行更改的弹窗，选择允许后重新运行本脚本
     rem 静默安装 Python
     %temp%\python-%downloadVersion%-amd64.exe /quiet InstallAllUsers=1 PrependPath=0
     
@@ -33,3 +35,5 @@ py -3.11 -m pip install -r requirements.txt
 
 rem 运行正式工具脚本
 py -3.11 .\src\main.py
+
+pause
