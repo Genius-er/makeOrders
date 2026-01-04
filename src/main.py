@@ -66,7 +66,7 @@ def main():
                 goodsId = row[sheetHead.index("产品ID")].value
                 rawDataItem = {}
 
-                goodsNum = row[sheetHead.index("产品数量")].value
+                goodsNum = row[sheetHead.index("产品总数")].value
                 if goodsId + color in skuColor:
                     rawDataItem = rawData[skuColor[goodsId+color]]
                     if size in rawDataItem["sizeNum"]:

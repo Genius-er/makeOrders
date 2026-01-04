@@ -2,6 +2,8 @@ out/*
 !out/
 
 temp/
+.venv/
+.vscode/
 
 resource/
 !resource/templete/
