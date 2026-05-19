@@ -445,8 +445,24 @@ class OrderToolGUI:
                         elif eachSize == "5XL":
                             worksheetTemplete.cell(goodsRaw + 1, goodsTableHead.index("3XL") + 1, "5XL:" + str(sizeNum[eachSize]))
                         else:
-                            worksheetTemplete.cell(goodsRaw, goodsTableHead.index(eachSize) + 1, str(sizeNum[eachSize]))
-                    worksheetTemplete.cell(goodsRaw, goodsTableHead.index("合计") + 1, int(totalNum))
+                            worksheetTemplete.cell(goodsRaw, goodsTableHead.index(eachSize) + 1, sizeNum[eachSize])
+                    # 合计列使用简单 SUM 公式，D-I 列已确保填入数字类型
+                    # 如果求和为 0 则显示为空，否则显示合计值
+                    worksheetTemplete.cell(goodsRaw, goodsTableHead.index("合计") + 1, f'=IF(SUM(D{goodsRaw}:I{goodsRaw})=0,"",SUM(D{goodsRaw}:I{goodsRaw}))')
+                    worksheetTemplete.cell(goodsRaw + 1, goodsTableHead.index("合计") + 1, f'=IF(SUM(D{goodsRaw + 1}:I{goodsRaw + 1})=0,"",SUM(D{goodsRaw + 1}:I{goodsRaw + 1}))')
+
+                    # 复制 L 列的价格公式（从模板行复制）
+                    # 第一行（goodsRaw）
+                    template_formula_row1 = worksheetTemplete.cell(row=9, column=12).value  # L9 的公式
+                    if template_formula_row1 and template_formula_row1.startswith('='):
+                        new_formula_row1 = template_formula_row1.replace('J9', f'J{goodsRaw}').replace('C9', f'C{goodsRaw}')
+                        worksheetTemplete.cell(row=goodsRaw, column=12).value = new_formula_row1
+                    
+                    # 第二行（goodsRaw + 1）- J列引用第二行（用户填写数量），C列引用第一行（因为C列是合并的）
+                    template_formula_row2 = worksheetTemplete.cell(row=10, column=12).value  # L10 的公式
+                    if template_formula_row2 and template_formula_row2.startswith('='):
+                        new_formula_row2 = template_formula_row2.replace('J10', f'J{goodsRaw + 1}').replace('C10', f'C{goodsRaw}')
+                        worksheetTemplete.cell(row=goodsRaw + 1, column=12).value = new_formula_row2
 
                 worksheetTemplete["C{}".format(goodsRaw)].number_format = worksheetTemplete["C9"].number_format
                 worksheetTemplete["C{}".format(goodsRaw)].font = worksheetTemplete["C9"].font.copy()
@@ -501,7 +517,7 @@ class OrderToolGUI:
                         def fix_row(match):
                             col_letter = match.group(1)
                             row_num = int(match.group(2))
-                            if row_num >= 11:
+                            if row_num >= 9:  # 修正：从第9行开始（删除后第9行变成第7行）
                                 return f"{col_letter}{row_num - 2}"
                             return match.group(0)
                         cell.value = re.sub(r'([A-Za-z])(\d+)', fix_row, cell.value)
