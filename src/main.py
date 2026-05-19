@@ -15,17 +15,51 @@ from openpyxl.drawing.xdr import XDRPoint2D, XDRPositiveSize2D
 from openpyxl.drawing.spreadsheet_drawing import AbsoluteAnchor, OneCellAnchor, AnchorMarker
 import copy
 import io
+import sys
 
-TEMPLETE_PATH = r".\resource\templete\templete.xlsx" # 最终订单模板路径
+def get_resource_path(relative_path):
+    """
+    获取资源文件的绝对路径，支持开发环境和打包后的环境
+    """
+    try:
+        # PyInstaller 打包后的临时目录
+        base_path = sys._MEIPASS
+    except AttributeError:
+        # 开发环境
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
-RESOUCE_PATH = r".\resource"
-OUTPUT_PATH = r".\out"
+def get_base_path():
+    """
+    获取程序运行的基础路径
+    """
+    if getattr(sys, 'frozen', False):
+        # 打包后的环境
+        return os.path.dirname(sys.executable)
+    else:
+        # 开发环境
+        return os.path.abspath(".")
+
+TEMPLETE_PATH = get_resource_path(r"templete.xlsx")  # 最终订单模板路径（从打包资源获取）
+RESOUCE_PATH = os.path.join(get_base_path(), "店小秘导出订单表")  # 店小秘导出订单表文件夹（在exe所在目录）
+OUTPUT_PATH = os.path.join(get_base_path(), "工具输出工厂单")  # 输出文件夹（在exe所在目录）
 
 
 def main():
     print("start making orders!!!!!")
 
     start_time = time.time()
+
+    # 确保店小秘导出订单表文件夹存在
+    if not os.path.exists(RESOUCE_PATH):
+        os.makedirs(RESOUCE_PATH)
+        print(f"已创建文件夹: {RESOUCE_PATH}")
+
+    # 确保输出文件夹存在
+    if not os.path.exists(OUTPUT_PATH):
+        os.makedirs(OUTPUT_PATH)
+        print(f"已创建文件夹: {OUTPUT_PATH}")
 
     # 遍历 RESOUCE_PATH 文件夹下所有文件，找出xlsx文件，并打印不带后缀文件名
     for file in os.listdir(RESOUCE_PATH):
@@ -52,16 +86,50 @@ def main():
                 
                 productSpecifications = row[sheetHead.index("产品规格")].value
 
-                # 支持的尺码配置
-                sizePart = re.findall(r'Size:(?:xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)?', productSpecifications, re.IGNORECASE)[0]
+                # 支持的尺码配置 - 同时支持英文格式(Size:XXX Color:XXX)和中文格式(颜色:XXX 尺寸:XXX)
+                size = "UNKNOWN"
+                color = "UNKNOWN"
+                
+                # 尝试匹配英文格式 Size:XXX
+                sizeMatches = re.findall(r'Size:(?:xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)?', productSpecifications, re.IGNORECASE)
+                if sizeMatches and sizeMatches[0]:
+                    sizePart = sizeMatches[0]
+                    size = sizePart.split(":")[1].upper() if len(sizePart.split(":")) > 1 else "UNKNOWN"
+                    if size == "":
+                        size = "UNKNOWN"
+                    # 提取颜色（英文格式）
+                    colorPart = productSpecifications.replace(sizePart, "")
+                    colorMatches = re.findall(r'Color:(.+?)(?:Size|$)', colorPart, re.IGNORECASE)
+                    if colorMatches:
+                        color = colorMatches[0].strip().replace(" ", "_")
+                    else:
+                        colorParts = colorPart.split(":")
+                        color = colorParts[1].strip().replace(" ", "_") if len(colorParts) > 1 else "UNKNOWN"
+                else:
+                    # 尝试匹配中文格式 尺寸:XXX
+                    sizeMatches = re.findall(r'尺寸[:：]\s*(xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)', productSpecifications, re.IGNORECASE)
+                    if sizeMatches:
+                        size = sizeMatches[0].upper()
+                    else:
+                        # 尝试更宽松的中文尺寸匹配
+                        sizeMatches = re.findall(r'尺寸[:：]\s*(\w+)', productSpecifications)
+                        if sizeMatches:
+                            size = sizeMatches[0].upper()
+                
+                    # 提取颜色（中文格式）
+                    colorMatches = re.findall(r'颜色[:：]\s*([^\n\r]+)', productSpecifications)
+                    if colorMatches:
+                        color = colorMatches[0].strip().replace(" ", "_")
+                
                 # size转换为同一格式，大写，XXXL改成3XL
-                size = sizePart.split(":")[1].upper()
                 num_x = len(re.findall(r'X', size))
-                if num_x > 1:
+                if num_x > 1 and size != "UNKNOWN":
                     size = size.replace('X' * num_x, str(num_x) + "X")
-
-                colorPart = productSpecifications.replace(sizePart, "")
-                color = colorPart.split(":")[1].replace(" ", "_") # color 的空格转换成_,key不能有空格
+                
+                # 如果仍然无法解析，跳过此行
+                if size == "UNKNOWN" and color == "UNKNOWN":
+                    print(f"警告：无法解析产品规格 '{productSpecifications}'，跳过此行")
+                    continue
 
                 goodsId = row[sheetHead.index("产品ID")].value
                 rawDataItem = {}
@@ -89,7 +157,7 @@ def main():
     end_time = time.time()
     elapsed_time = end_time - start_time
     print("脚本总用时: {} 分 {} 秒".format(int(elapsed_time/60), int(elapsed_time%60)))
-    print("输出文件在 out 这个文件夹里")
+    print("输出文件在 工具输出工厂单 这个文件夹里")
 
 
 
@@ -163,7 +231,7 @@ def genfinalOrder(rawData, file_name):
     workbookDianTemplete = openpyxl.load_workbook(TEMPLETE_PATH)
     worksheetTemplete = workbookDianTemplete["Sheet1"]
 
-    goodsStartRowNum =11 # 商品开始的行数，每2行为一个产品
+    goodsStartRowNum =11 # 商品开始的行数，每2行为一个产品（保持原有位置，避免公式错位）
 
     # 遍历原始数据，写入到模板表格
     # 模板表格产品表头
@@ -200,12 +268,13 @@ def genfinalOrder(rawData, file_name):
             img = img.convert("RGB")
 
             # 没有 temp 文件夹就创建一个 temp文件夹
-            if not os.path.exists("./temp"):
-                os.mkdir("./temp")
+            temp_dir = os.path.join(get_base_path(), "temp")
+            if not os.path.exists(temp_dir):
+                os.mkdir(temp_dir)
 
-            img.save("./temp/tempImg{}.jpg".format(i))
+            img.save(os.path.join(temp_dir, f"tempImg{i}.jpg"))
             # 设置产品图片
-            inster_image(worksheetTemplete, goodsRaw + 1, 2, 0, "./temp/tempImg{}.jpg".format(i), image_size=(60, 60))
+            inster_image(worksheetTemplete, goodsRaw + 1, 2, 0, os.path.join(temp_dir, f"tempImg{i}.jpg"), image_size=(60, 60))
 
             # 各尺码数量
             sizeNum = rawDataItem["sizeNum"]
@@ -235,6 +304,33 @@ def genfinalOrder(rawData, file_name):
         worksheetTemplete["C{}".format(goodsRaw)].fill = copy.copy(worksheetTemplete["C9"].fill)
         worksheetTemplete["C{}".format(goodsRaw)].protection = copy.copy(worksheetTemplete["C9"].protection)
 
+        # 复制数据验证（下拉菜单）
+        from openpyxl.worksheet.datavalidation import DataValidation
+        # 在工作表的 data_validations 中查找应用于 C9 单元格的验证规则
+        source_dv = None
+        for dv in worksheetTemplete.data_validations.dataValidation:
+            if 'C9' in dv.sqref:
+                source_dv = dv
+                break
+        
+        if source_dv:
+            new_dv = DataValidation(
+                type=source_dv.type,
+                operator=source_dv.operator,
+                formula1=source_dv.formula1,
+                formula2=source_dv.formula2,
+                allow_blank=source_dv.allow_blank,
+                showDropDown=source_dv.showDropDown,
+                showErrorMessage=source_dv.showErrorMessage,
+                errorStyle=source_dv.errorStyle,
+                errorTitle=source_dv.errorTitle,
+                error=source_dv.error,
+                showInputMessage=source_dv.showInputMessage,
+                promptTitle=source_dv.promptTitle,
+                prompt=source_dv.prompt,
+            )
+            worksheetTemplete.add_data_validation(new_dv)
+            new_dv.add(f'C{goodsRaw}:C{goodsRaw + 1}')
 
 
         # 合并单元格
@@ -260,6 +356,32 @@ def genfinalOrder(rawData, file_name):
                 cell = worksheetTemplete.cell(row=row, column=col)
                 cell.border = thin_border
 
+    # 删除模板中的第9行和第10行数据模板行（在写入数据之后删除）
+    # 删除前需要更新公式引用，因为删除行会导致公式引用错位
+    # 使用正则表达式更新公式中的单元格引用（删除2行，所以>=11的行号需要减2）
+    import re
+    for row in range(11, 220):  # 假设最多220行
+        for col in range(1, 20):  # 假设最多20列
+            cell = worksheetTemplete.cell(row=row, column=col)
+            if cell.data_type == 'f' and cell.value:
+                # 匹配单元格引用（如J11, C11等），并将>=11的行号减2
+                def fix_row(match):
+                    col_letter = match.group(1)
+                    row_num = int(match.group(2))
+                    if row_num >= 11:
+                        return f"{col_letter}{row_num - 2}"
+                    return match.group(0)
+                cell.value = re.sub(r'([A-Za-z])(\d+)', fix_row, cell.value)
+    
+    # 删除行前调整图片位置（将图片行号减2）
+    for img in worksheetTemplete._images:
+        anchor = img.anchor
+        if hasattr(anchor, '_from') and anchor._from.row >= 10:  # 第10行及以下的图片需要调整
+            anchor._from.row -= 2
+    
+    # 现在删除模板行
+    worksheetTemplete.delete_rows(9, 2)
+
     # 没有 OUTPUT_PATH 这个文件夹则创建这个文件夹
     if not os.path.exists(OUTPUT_PATH):
         os.mkdir(OUTPUT_PATH)
@@ -268,5 +390,10 @@ def genfinalOrder(rawData, file_name):
     print(os.path.join(OUTPUT_PATH, f'{file_name}_result.xlsx'))
 
 
-
 main()
+
+# 暂停程序，等待用户按任意键后退出
+try:
+    input("按 Enter 键退出...")
+except EOFError:
+    pass

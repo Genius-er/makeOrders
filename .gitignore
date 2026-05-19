@@ -1,9 +1,34 @@
 out/*
 !out/
 
+工具输出工厂单/*
+!工具输出工厂单/
+
 temp/
 .venv/
+venv/
 .vscode/
 
-resource/
-!resource/templete/
+店小秘导出订单表/*
+!店小秘导出订单表/
+
+templete.xlsx
+
+# PyInstaller build output
+dist/
+build/
+*.spec
+*.exe
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.Python
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.bak
