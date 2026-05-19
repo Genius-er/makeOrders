@@ -258,7 +258,10 @@ def genfinalOrder(rawData, file_name):
             # 产品序号
             worksheetTemplete["A{}".format(goodsRaw)] = i + 1
 
-            # 从url获取产品图片
+            # 产品名称（写入名称，供 L 列价格公式使用 VLOOKUP 查找）
+            worksheetTemplete["C{}".format(goodsRaw)] = rawDataItem["goodsName"]
+
+            # 从 url 获取产品图片
             print("sku：", rawDataItem["sku"], "||color：", rawDataItem["color"], "||图片地址：", rawDataItem["imgUrl"])
             opener = urllib.request.build_opener()
             opener.addheaders = [('User-agent', 'Mozilla/5.0')]
@@ -267,7 +270,7 @@ def genfinalOrder(rawData, file_name):
             img = PIL.Image.open(io.BytesIO(response.read()))
             img = img.convert("RGB")
 
-            # 没有 temp 文件夹就创建一个 temp文件夹
+            # 没有 temp 文件夹就创建一个 temp 文件夹
             temp_dir = os.path.join(get_base_path(), "temp")
             if not os.path.exists(temp_dir):
                 os.mkdir(temp_dir)
@@ -291,7 +294,7 @@ def genfinalOrder(rawData, file_name):
                     worksheetTemplete.cell(goodsRaw, goodsTableHead.index(eachSize) + 1, str(sizeNum[eachSize]))
             worksheetTemplete.cell(goodsRaw, goodsTableHead.index("合计") + 1, int(totalNum))
 
-        # 产品名称（暂时先复制上面的模板）
+        # 复制产品名称单元格的格式
         worksheetTemplete["C{}".format(goodsRaw)].number_format = worksheetTemplete["C9"].number_format
         # worksheetTemplete["C{}".format(goodsRaw)].font = worksheetTemplete["C9"].font.copy()
         # worksheetTemplete["C{}".format(goodsRaw)].alignment = worksheetTemplete["C9"].alignment.copy()
