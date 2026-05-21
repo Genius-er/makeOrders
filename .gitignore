@@ -14,9 +14,7 @@ venv/
 
 
 # PyInstaller build output
-dist/
 build/
-*.exe
 
 # Python cache
 __pycache__/
