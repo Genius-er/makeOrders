@@ -12,12 +12,10 @@ venv/
 店小秘导出订单表/*
 !店小秘导出订单表/
 
-templete.xlsx
 
 # PyInstaller build output
 dist/
 build/
-*.spec
 *.exe
 
 # Python cache
