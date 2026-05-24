@@ -367,6 +367,21 @@ class OrderToolGUI:
                     if colorMatches:
                         color = colorMatches[0].strip().replace(" ", "_")
 
+                    # 中文模式未匹配时，尝试英文/西班牙语模式 (如 Talla:, Color:)
+                    if size == "UNKNOWN":
+                        sizeMatches = re.findall(r'(?:Talla|Size|Tallaje)[:：]\s*(xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)', productSpecifications, re.IGNORECASE)
+                        if sizeMatches:
+                            size = sizeMatches[0].upper()
+                        else:
+                            sizeMatches = re.findall(r'(?:Talla|Size|Tallaje)[:：]\s*(\w+)', productSpecifications)
+                            if sizeMatches:
+                                size = sizeMatches[0].upper()
+
+                    if color == "UNKNOWN":
+                        colorMatches = re.findall(r'Color[:：]\s*([^\n\r]+)', productSpecifications, re.IGNORECASE)
+                        if colorMatches:
+                            color = colorMatches[0].strip().replace(" ", "_")
+
                 num_x = len(re.findall(r'X', size))
                 if num_x > 1 and size != "UNKNOWN":
                     size = size.replace('X' * num_x, str(num_x) + "X")
