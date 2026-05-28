@@ -292,6 +292,22 @@ class OrderToolGUI:
             base_path = os.path.abspath(".")
         return os.path.join(base_path, relative_path)
 
+    def normalize_size(self, size):
+        """将非标准码数映射到模板支持的标准码（S, M, L, XL, 2XL, 3XL, 4XL, 5XL）"""
+        SIZE_MAPPING = {
+            # 西班牙语 / 欧洲码 → 标准码
+            "P": "S",
+            "CH": "S",
+            "G": "L",
+            "EG": "XL",
+            "EEG": "2XL",
+        }
+        if size in SIZE_MAPPING:
+            mapped = SIZE_MAPPING[size]
+            self.update_status(f"码数映射: {size} → {mapped}")
+            return mapped
+        return size
+
     def process_orders(self):
         try:
             input_file = self.input_file_path.get()
@@ -385,6 +401,9 @@ class OrderToolGUI:
                 num_x = len(re.findall(r'X', size))
                 if num_x > 1 and size != "UNKNOWN":
                     size = size.replace('X' * num_x, str(num_x) + "X")
+
+                # 将非标准码数映射到模板支持的标准码
+                size = self.normalize_size(size)
 
                 if size == "UNKNOWN" and color == "UNKNOWN":
                     self.update_status(f"警告：无法解析产品规格 '{productSpecifications}'，跳过此行")
