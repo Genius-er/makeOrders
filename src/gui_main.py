@@ -432,7 +432,7 @@ class OrderToolGUI:
 
             self.update_status(f"共解析 {len(rawData)} 个商品")
 
-            goodsStartRowNum = 11
+            goodsStartRowNum = 9
 
             goodsTableHead = []
             for cell in worksheetTemplete[7]:
@@ -543,25 +543,6 @@ class OrderToolGUI:
                     for row_idx in range(goodsRaw, goodsRaw + 2):
                         cell = worksheetTemplete.cell(row=row_idx, column=col)
                         cell.border = thin_border
-
-            for row in range(11, 220):
-                for col in range(1, 20):
-                    cell = worksheetTemplete.cell(row=row, column=col)
-                    if cell.data_type == 'f' and cell.value:
-                        def fix_row(match):
-                            col_letter = match.group(1)
-                            row_num = int(match.group(2))
-                            if row_num >= 9:  # 修正：从第9行开始（删除后第9行变成第7行）
-                                return f"{col_letter}{row_num - 2}"
-                            return match.group(0)
-                        cell.value = re.sub(r'([A-Za-z])(\d+)', fix_row, cell.value)
-
-            for img in worksheetTemplete._images:
-                anchor = img.anchor
-                if hasattr(anchor, '_from') and anchor._from.row >= 10:
-                    anchor._from.row -= 2
-
-            worksheetTemplete.delete_rows(9, 2)
 
             output_dir = os.path.dirname(output_file)
             if output_dir and not os.path.exists(output_dir):
