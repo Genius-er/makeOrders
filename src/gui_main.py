@@ -383,26 +383,26 @@ class OrderToolGUI:
                     if colorMatches:
                         color = colorMatches[0].strip().replace(" ", "_")
 
-                    # 中文模式未匹配时，尝试英文/西班牙语/意大利语模式 (如 Talla:, Talle:, Color:)
+                    # 中文模式未匹配时，尝试英文/西班牙语/意大利语/葡萄牙语模式 (如 Talla:, Talle:, Tamanho:, Color:, Cor:)
                     if size == "UNKNOWN":
-                        # 支持多行格式，如 "Talle:XL\nColor:Gris"
-                        sizeMatches = re.findall(r'(?:Talla|Talle|Size|Tallaje)[:：]\s*(xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)\b', productSpecifications, re.IGNORECASE)
+                        # 支持多行格式，如 "Talle:XL\nColor:Gris" 或 "Tamanho:M\nCor:Short sleeve set1"
+                        sizeMatches = re.findall(r'(?:Talla|Talle|Size|Tallaje|Tamanho)[:：]\s*(xs|s|m|l|xl|xxl|xxxl|xxxxl|2xl|3xl|4xl|5xl)\b', productSpecifications, re.IGNORECASE)
                         if sizeMatches:
                             size = sizeMatches[0].upper()
                         else:
                             # 匹配任意非空白字符作为尺码值（支持多行格式）
-                            sizeMatches = re.findall(r'(?:Talla|Talle|Size|Tallaje)[:：]\s*(\S+)', productSpecifications, re.IGNORECASE)
+                            sizeMatches = re.findall(r'(?:Talla|Talle|Size|Tallaje|Tamanho)[:：]\s*(\S+)', productSpecifications, re.IGNORECASE)
                             if sizeMatches:
                                 size = sizeMatches[0].upper()
 
                     if color == "UNKNOWN":
-                        # 支持多行格式，如 "Talle:XL\nColor:Gris"
-                        colorMatches = re.findall(r'Color[:：]\s*([^\n\r]+)', productSpecifications, re.IGNORECASE)
+                        # 支持多行格式，如 "Talle:XL\nColor:Gris" 或 "Tamanho:M\nCor:Short sleeve set1"
+                        colorMatches = re.findall(r'(?:Color|Cor)[:：]\s*([^\n\r]+)', productSpecifications, re.IGNORECASE)
                         if colorMatches:
                             color = colorMatches[0].strip().replace(" ", "_")
                         else:
-                            # 尝试匹配 Color: 后面直到换行或行尾的内容
-                            colorMatches = re.findall(r'Color[:：]\s*(\S+)', productSpecifications, re.IGNORECASE)
+                            # 尝试匹配 Color: 或 Cor: 后面直到换行或行尾的内容
+                            colorMatches = re.findall(r'(?:Color|Cor)[:：]\s*(\S+)', productSpecifications, re.IGNORECASE)
                             if colorMatches:
                                 color = colorMatches[0].strip().replace(" ", "_")
 
