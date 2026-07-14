@@ -301,6 +301,12 @@ class OrderToolGUI:
             "G": "L",
             "EG": "XL",
             "EEG": "2XL",
+            # 葡萄牙语 / 巴西码 → 标准码
+            # "PP": "XS",    # Pequeno Pequeno
+            "GG": "XL",    # Grande Grande（用户确认口径）
+            # "XG": "XL",    # Extra Grande
+            # "XGG": "2XL",  # Extra Grande Grande
+            # "EXG": "2XL",  # Extra Extra Grande
         }
         if size in SIZE_MAPPING:
             mapped = SIZE_MAPPING[size]
