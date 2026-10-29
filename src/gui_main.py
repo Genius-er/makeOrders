@@ -8,8 +8,10 @@ import tempfile
 import threading
 import time
 import re
+from copy import copy
 import openpyxl
 import urllib.request
+import urllib.error
 import io
 import PIL.Image
 from openpyxl.drawing.image import Image as XLImage
@@ -468,11 +470,54 @@ class OrderToolGUI:
                     worksheetTemplete["A{}".format(goodsRaw)] = i + 1
 
                     self.update_status(f"下载图片: {rawDataItem['sku']} - {rawDataItem['color']}")
-                    opener = urllib.request.build_opener()
-                    opener.addheaders = [('User-agent', 'Mozilla/5.0')]
-                    response = opener.open(rawDataItem["imgUrl"])
-                    img = PIL.Image.open(io.BytesIO(response.read()))
-                    img = img.convert("RGB")
+                    # 相邻图片下载间隔 2 秒，避免连续请求触发服务器限流
+                    if i > 0:
+                        time.sleep(2)
+                    # 使用完整浏览器请求头，降低被 CDN 风控拦截的概率；
+                    # 不提供 image/avif（旧版 Pillow 无法解析 AVIF，会导致"cannot identify image file"）
+                    img = None
+                    last_content_type = "未知"
+                    accept_list = [
+                        'image/webp,image/apng,image/jpeg,image/png,*/*;q=0.8',
+                        'image/jpeg,image/png',  # 兜底：明确只要 JPEG/PNG
+                    ]
+                    for accept in accept_list:
+                        opener = urllib.request.build_opener()
+                        opener.addheaders = [
+                            ('User-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'),
+                            ('Accept', accept),
+                        ]
+                        # 遇到限流(429)或服务器错误(5xx)时重试，最多 6 次，指数退避
+                        img_data = None
+                        max_attempts = 6
+                        for attempt in range(max_attempts):
+                            try:
+                                response = opener.open(rawDataItem["imgUrl"], timeout=30)
+                                img_data = response.read()
+                                last_content_type = response.headers.get("Content-Type", "未知")
+                                break
+                            except urllib.error.HTTPError as http_err:
+                                # 其他 HTTP 错误（如 404）没有重试意义，直接抛出
+                                if http_err.code != 429 and http_err.code < 500:
+                                    raise
+                                if attempt == max_attempts - 1:
+                                    raise
+                                # 优先遵循服务器返回的 Retry-After，否则退避等待 5s、10s、20s、40s、60s
+                                retry_after = http_err.headers.get("Retry-After")
+                                if retry_after and retry_after.strip().isdigit():
+                                    wait = min(int(retry_after), 120)
+                                else:
+                                    wait = min(5 * 2 ** attempt, 60)
+                                self.update_status(f"下载受限(HTTP {http_err.code})，{wait} 秒后重试({attempt + 2}/{max_attempts})...")
+                                time.sleep(wait)
+                        try:
+                            img = PIL.Image.open(io.BytesIO(img_data)).convert("RGB")
+                            break
+                        except Exception:
+                            # 内容不是 Pillow 可识别的图片（如 AVIF/风控页面），换更保守的 Accept 重试
+                            img = None
+                    if img is None:
+                        raise RuntimeError(f"下载的内容不是有效图片 (Content-Type: {last_content_type})，请检查图片链接: {rawDataItem['imgUrl']}")
 
                     temp_dir = os.path.join(tempfile.gettempdir(), "order_tool_temp")
                     if not os.path.exists(temp_dir):
@@ -513,10 +558,11 @@ class OrderToolGUI:
                         worksheetTemplete.cell(row=goodsRaw + 1, column=12).value = new_formula_row2
 
                 worksheetTemplete["C{}".format(goodsRaw)].number_format = worksheetTemplete["C9"].number_format
-                worksheetTemplete["C{}".format(goodsRaw)].font = worksheetTemplete["C9"].font.copy()
-                worksheetTemplete["C{}".format(goodsRaw)].alignment = worksheetTemplete["C9"].alignment.copy()
-                worksheetTemplete["C{}".format(goodsRaw)].border = worksheetTemplete["C9"].border.copy()
-                worksheetTemplete["C{}".format(goodsRaw)].fill = worksheetTemplete["C9"].fill.copy()
+                # 使用 copy() 标准复制方式，避免 openpyxl 已弃用的 .copy() 方法警告
+                worksheetTemplete["C{}".format(goodsRaw)].font = copy(worksheetTemplete["C9"].font)
+                worksheetTemplete["C{}".format(goodsRaw)].alignment = copy(worksheetTemplete["C9"].alignment)
+                worksheetTemplete["C{}".format(goodsRaw)].border = copy(worksheetTemplete["C9"].border)
+                worksheetTemplete["C{}".format(goodsRaw)].fill = copy(worksheetTemplete["C9"].fill)
 
                 from openpyxl.worksheet.datavalidation import DataValidation
                 source_dv = None
@@ -577,8 +623,11 @@ class OrderToolGUI:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
         except Exception as e:
-            self.update_status(f"错误: {str(e)}")
-            self.root.after(0, lambda: messagebox.showerror("错误", f"处理订单时出错:\n{str(e)}"))
+            # Python 3.12+ 在 except 块结束后会清除 e，而 after 回调延迟执行，
+            # lambda 里直接引用 e 会抛 NameError，因此先把错误信息存到独立变量
+            err_msg = str(e)
+            self.update_status(f"错误: {err_msg}")
+            self.root.after(0, lambda: messagebox.showerror("错误", f"处理订单时出错:\n{err_msg}"))
 
         finally:
             self.is_processing = False
